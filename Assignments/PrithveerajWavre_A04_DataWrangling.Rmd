@@ -1,6 +1,6 @@
 ---
 title: "Assignment 4: Data Wrangling (Fall 2024)"
-author: "Student Name"
+author: "Prithveeraj Wavre"
 output: pdf_document
 geometry: margin=2.54cm
 ---
@@ -31,18 +31,48 @@ This exercise accompanies the lessons in Environmental Data Analytics on Data Wr
 
 ```{r setup, message = FALSE}
 #1a 
+library(lubridate)
+library(tidyverse)
+library(here)
 
 #1b 
 
+here()
+
 #1c 
+
+EPA_O3_NC2018 <- read.csv(
+  file=here("Data/Raw/EPAair_O3_NC2018_raw.csv"), 
+  stringsAsFactors = TRUE
+)
+
+EPA_O3_NC2019 <- read.csv(
+  file=here("Data/Raw/EPAair_O3_NC2019_raw.csv"), 
+  stringsAsFactors = TRUE
+)
+
+EPA_PM25_NC2018 <- read.csv(
+  file=here("Data/Raw/EPAair_PM25_NC2018_raw.csv"), 
+  stringsAsFactors = TRUE
+)
+
+EPA_PM25_NC2019 <- read.csv(
+  file=here("Data/Raw/EPAair_PM25_NC2019_raw.csv"), 
+  stringsAsFactors = TRUE
+)
 
 #2 
 
+dim(EPA_O3_NC2018)
+dim(EPA_O3_NC2019)
+dim(EPA_PM25_NC2018)
+dim(EPA_PM25_NC2019)
 
+#All the datasets have 20 columns. 
 ```
 
 >All four datasets should have the same number of columns but unique record counts (rows). Do your datasets follow this pattern?
-
+Yes, all the datasets have 20 columns and different number of rows.  
 
 ## Wrangle individual datasets to create processed files.
 
@@ -57,15 +87,39 @@ This exercise accompanies the lessons in Environmental Data Analytics on Data Wr
 ```{r questions 3 thru 4}
 #3
 
+EPA_O3_NC2018$Date <- mdy(EPA_O3_NC2018$Date)
+EPA_O3_NC2019$Date <- mdy(EPA_O3_NC2019$Date)
+EPA_PM25_NC2018$Date <- mdy(EPA_PM25_NC2018$Date)
+EPA_PM25_NC2019$Date <- mdy(EPA_PM25_NC2019$Date)
 
 #4
 
+EPA_O3_NC2018_New <- select(EPA_O3_NC2018, Date, DAILY_AQI_VALUE, Site.Name, AQS_PARAMETER_DESC, COUNTY, SITE_LATITUDE, SITE_LONGITUDE)
+
+EPA_O3_NC2019_New <- select(EPA_O3_NC2019, Date, DAILY_AQI_VALUE, Site.Name, AQS_PARAMETER_DESC, COUNTY, SITE_LATITUDE, SITE_LONGITUDE)
+
+EPA_PM25_NC2018_New <- select(EPA_PM25_NC2018, Date, DAILY_AQI_VALUE, Site.Name, AQS_PARAMETER_DESC, COUNTY, SITE_LATITUDE, SITE_LONGITUDE)
+
+EPA_PM25_NC2019_New <- select(EPA_O3_NC2019, Date, DAILY_AQI_VALUE, Site.Name, AQS_PARAMETER_DESC, COUNTY, SITE_LATITUDE, SITE_LONGITUDE)
 
 #5
 
+EPA_PM25_NC2018_New <- mutate(EPA_PM25_NC2018_New, AQS_PARAMETER_DESC = "2.5")
+
+EPA_PM25_NC2019_New <- mutate(EPA_PM25_NC2019_New, AQS_PARAMETER_DESC = "2.5")
 
 #6
 
+Processed <- "~/Forked_EDA_Spring2025/Data/Processed/"
+
+
+write.csv(EPA_O3_NC2018_New, paste0(Processed, "EPAair_O3_NC2018_processed.csv"), row.names = FALSE)
+
+write.csv(EPA_O3_NC2019_New, paste0(Processed, "EPAair_O3_NC2019_processed.csv"), row.names = FALSE)
+
+write.csv(EPA_PM25_NC2018_New, paste0(Processed, "EPAair_PM25_NC2018_processed.csv"), row.names = FALSE)
+
+write.csv(EPA_PM25_NC2019_New, paste0(Processed, "EPAair_PM25_NC2019_processed.csv"), row.names = FALSE)
 ```
 
 
@@ -98,20 +152,38 @@ This exercise accompanies the lessons in Environmental Data Analytics on Data Wr
 
 ```{r questions 7 thru 11}
 #7 
+#The column names are identical 
 
+EPA_Air_combined <- rbind(EPA_PM25_NC2019_New, EPA_PM25_NC2018_New, EPA_O3_NC2019_New, EPA_O3_NC2018_New )
 
 #8 
+sites <- c("Linville Falls", "Durham Armory", "Leggett", "Hattie Avenue",  
+  "Clemmons Middle", "Mendenhall School", "Frying Pan Mountain", 
+  "West Johnston Co.", "Garinger High School", "Castle Hayne", 
+  "Pitt Agri. Center", "Bryson City", "Millbrook School" )
 
+EPA_Air_combined_commonsites <- 
+  EPA_Air_combined %>% 
+  filter(Site.Name %in% sites) %>% 
+  mutate(Month = month(Date), Year = year(Date)) %>% 
+  group_by(Date, Site.Name, AQS_PARAMETER_DESC, COUNTY, Month, Year) %>% 
+  summarise(meanAQI = mean(DAILY_AQI_VALUE),
+            meanlat = mean(SITE_LATITUDE), 
+            meanlon = mean(SITE_LONGITUDE),
+            .groups = 'drop')
+  
 
 #9
 
+EPA_Air_combined_commonsites_wider <- EPA_Air_combined_commonsites %>%
+  pivot_wider(names_from = AQS_PARAMETER_DESC, values_from = meanAQI)
 
 #10
-
+dim(EPA_Air_combined_commonsites_wider)
 
 #11
 
-
+write.csv(EPA_PM25_NC2019_New, paste0(Processed, "EPAair_O3_PM25_NC1819_Processed.csv"), row.names = FALSE)
 ```
 
 
@@ -125,14 +197,24 @@ This exercise accompanies the lessons in Environmental Data Analytics on Data Wr
 
 #12
 
+EPA_Air_combined_commonsites_wider <- EPA_Air_combined_commonsites_wider %>%
+  rename(`PM2.5` = `2.5`)  # Rename the column
+
+EPA_Air_combined_commonsites_summary <- 
+  EPA_Air_combined_commonsites_wider %>% 
+  group_by(Site.Name, Month, Year) %>% 
+  summarise(mean_2.5AQI = mean(PM2.5),
+            mean_ozone = mean(Ozone), 
+            .groups = 'drop') %>% 
+  drop_na(mean_ozone)
 
 #13
 
 
-
+dim(EPA_Air_combined_commonsites_summary)
 ```
 
 14. Why did we use the function `drop_na` rather than `na.omit`? Hint: replace `drop_na` with `na.omit` in part 12 and observe what happens with the dimensions of the summary date frame.
 
 > Answer: 
-
+na.omit deletes all rows which has missing values where drop_na only eliminates row with missing values from column mean_ozone
